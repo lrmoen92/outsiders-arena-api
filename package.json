@@ -1,0 +1,11 @@
+{
+    "scripts": {
+        "ts": "tsc",
+        "start": "node out/app.js"
+    },
+    "dependencies": {
+        "cassandra-driver": "^4.6.1",
+        "express": "^4.17.1",
+        "sequelize": "^6.3.5"
+    }
+}
