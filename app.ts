@@ -35,7 +35,9 @@ import { Client, ClientOptions } from "cassandra-driver";
 
 // var assert = require('assert');
 let app = require('express')();
-let server = require('http').createServer(app);
+let http = require('http');
+let server = http.createServer(app);
+let WebSocketServer = require('websocket').server;
 require('cassandra-driver'); 
 let client : Client;
 
@@ -286,7 +288,7 @@ let prepareEndpoints = function(){
     
     // get all characters
     app.get('/api/character/', (req, res) => {
-        runQuery('SELECT * FROM OUTSIDERS_ARENA.CHARACTER').then((val) => {
+        runQuery('SELECT * FROM OUTSIDERS_ARENA.CHARACTER WHERE ID > -1 ORDER BY ID').then((val) => {
             res.send(val.rows);
         });
     })
@@ -300,7 +302,7 @@ let prepareEndpoints = function(){
 } 
 
 let prepareApp = function () {
-
+    server.listen(9898);
     app.listen(3000);
 }
 
@@ -312,54 +314,26 @@ let run = async function () {
 
     prepareApp();
 
-    battleSocket();
+    prepareSockets();
 } 
 
-let battleSocket = function () {
-    // registry.addHandler(battleSocketHandler, "/arena/{arenaId}").setAllowedOrigins("*");
-    // registry.addHandler(globalSocketHandler, "/chat").setAllowedOrigins("*");
-
-    let socketBus = new WebSockets
+let prepareSockets = function() {
+    
+    let wsServer = new WebSocketServer({
+        httpServer: server
+    });
+    
+    wsServer.on('request', function(request) {
+        const connection = request.accept(null, request.origin);
+    
+        connection.on('message', function(message) {
+          console.log('Received Message:', message.utf8Data);
+          connection.sendUTF('Hi this is WebSocket server!');
+        });
+        connection.on('close', function(reasonCode, description) {
+            console.log('Client has disconnected.');
+        });
+    });
 }
 
 run();
-
-class WebSockets {
-    users = [];
-    connection(client) {
-      // event fired when the chat room is disconnected
-      client.on("disconnect", () => {
-        this.users = this.users.filter((user) => user.socketId !== client.id);
-      });
-      // add identity of user mapped to the socket id
-      client.on("identity", (userId) => {
-        this.users.push({
-          socketId: client.id,
-          userId: userId,
-        });
-      });
-      // subscribe person to chat & other user as well
-      client.on("subscribe", (room, otherUserId = "") => {
-        this.subscribeOtherUser(room, otherUserId);
-        client.join(room);
-      });
-      // mute a chat room
-      client.on("unsubscribe", (room) => {
-        client.leave(room);
-      });
-    }
-  
-    subscribeOtherUser(room, otherUserId) {
-      const userSockets = this.users.filter(
-        (user) => user.userId === otherUserId
-      );
-      userSockets.map((userInfo) => {
-        const socketConn = global.io.sockets.connected(userInfo.socketId);
-        if (socketConn) {
-          socketConn.join(room);
-        }
-      });
-    }
-  }
-  
-  export default new WebSockets();

@@ -69,6 +69,9 @@ var cassandra_driver_1 = require("cassandra-driver");
 // console.log(q3);
 // var assert = require('assert');
 var app = require('express')();
+var http = require('http');
+var server = http.createServer(app);
+var WebSocketServer = require('websocket').server;
 require('cassandra-driver');
 var client;
 function runQuery(query, params) {
@@ -293,7 +296,7 @@ var prepareEndpoints = function () {
     });
     // get all characters
     app.get('/api/character/', function (req, res) {
-        runQuery('SELECT * FROM OUTSIDERS_ARENA.CHARACTER').then(function (val) {
+        runQuery('SELECT * FROM OUTSIDERS_ARENA.CHARACTER WHERE ID > -1 ORDER BY ID').then(function (val) {
             res.send(val.rows);
         });
     });
@@ -305,6 +308,7 @@ var prepareEndpoints = function () {
     });
 };
 var prepareApp = function () {
+    server.listen(9898);
     app.listen(3000);
 };
 // start app V
@@ -317,8 +321,24 @@ var run = function () {
                     _a.sent();
                     prepareEndpoints();
                     prepareApp();
+                    prepareSockets();
                     return [2 /*return*/];
             }
+        });
+    });
+};
+var prepareSockets = function () {
+    var wsServer = new WebSocketServer({
+        httpServer: server
+    });
+    wsServer.on('request', function (request) {
+        var connection = request.accept(null, request.origin);
+        connection.on('message', function (message) {
+            console.log('Received Message:', message.utf8Data);
+            connection.sendUTF('Hi this is WebSocket server!');
+        });
+        connection.on('close', function (reasonCode, description) {
+            console.log('Client has disconnected.');
         });
     });
 };
